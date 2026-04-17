@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+    mysql-backup:
+        image: mysql:8.4
+        container_name: mysql-backup-runner
+        volumes:
+            - .:/app
+            - ${BACKUP_DIR:-./backups}:/backup
+        working_dir: /app
+        network_mode: host
+        command: ["/app/backup.sh"]
+        environment:
+            - TZ=Europe/Moscow
