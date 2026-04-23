@@ -1,0 +1,78 @@
+x-common-env: &timezone-env
+  TZ: Europe/Moscow
+
+services:
+  php-base:
+    build:
+      context: .
+      dockerfile: ./php/base/Dockerfile
+      args:
+        PHP_VERSION: 8.4
+    image: php-base
+    container_name: php-base
+    environment:
+      <<: *timezone-env
+
+  php-cli:
+    build:
+      context: ./
+      dockerfile: ./php/cli/Dockerfile
+    container_name: php-cli
+    restart: always
+    environment:
+      - COMPOSER_AUTH={"gitlab-token":{"gitlab.mdz.su":"${GITLAB_TOKEN}"}}
+    tty: true
+    working_dir: /var/www/app
+    volumes:
+      - .././:/var/www/app
+    depends_on:
+      - php-base
+
+  php-fpm:
+    build:
+      context: ./
+      dockerfile: ./php/fpm/Dockerfile
+      args:
+        PHP_VERSION: 8.4
+    container_name: php-fpm
+    restart: always
+    ports:
+      - "9000:9000"
+    environment:
+      <<: *timezone-env
+    working_dir: /var/www/app
+    volumes:
+      - .././:/var/www/app
+      - ./php/_config/php.ini:/usr/local/etc/php/conf.d/php.ini
+    command: php-fpm
+    depends_on:
+      - mysql
+
+  nginx:
+    image: nginx
+    container_name: nginx
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      <<: *timezone-env
+    working_dir: /var/www/app
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d/
+      - .././:/var/www/app
+      - ./_logs/nginx:/var/log/nginx
+    links:
+      - php-fpm
+
+  mysql:
+    image: mariadb
+    container_name: mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./_db-data:/var/lib/mysql
+    environment:
+      - MYSQL_USER=root
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=default
